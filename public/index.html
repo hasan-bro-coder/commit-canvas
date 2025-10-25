@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Commit Pattern Editor</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      :root {
+        --bg: #0d1117;
+        --panel: #11161d;
+        --accent: #2ea043;
+        --text: #c9d1d9;
+        --muted: #8b949e;
+        --border: #21262d;
+
+        --green1: #033a16;
+        --green2: #196c2e;
+        --green3: #2ea043;
+        --green4: #56d364;
+
+        font-family: "JetBrains Mono", monospace;
+        font-size: 14px;
+        color: var(--text);
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        display: flex;
+        justify-content: center;
+        padding: 28px;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 1100px;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 20px;
+      }
+
+      h1 {
+        margin: 0;
+        font-weight: 600;
+        color: var(--accent);
+        font-size: 20px;
+      }
+
+      .row {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+      }
+
+      input,
+      select,
+      button {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        padding: 7px 10px;
+        border-radius: 6px;
+        color: var(--text);
+        font-family: inherit;
+      }
+
+      input:focus,
+      select:focus {
+        outline: 1px solid var(--accent);
+      }
+
+      button {
+        cursor: pointer;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        font-weight: 600;
+        transition: opacity 0.2s;
+      }
+      button:hover {
+        opacity: 0.85;
+      }
+
+      #tools {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin: 18px 0 6px;
+      }
+
+      .brush {
+        width: 22px;
+        height: 22px;
+        border-radius: 4px;
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: 0.1s;
+      }
+      .selected {
+        border-color: white;
+      }
+
+      #grid {
+        margin-top: 20px;
+        display: grid;
+        grid-template-columns: repeat(53, 14px);
+        gap: 6px;
+        user-select: none;
+      }
+
+      .cell {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .level-0 {
+        background: #11161d;
+      }
+      .level-1 {
+        background: var(--green1);
+      }
+      .level-2 {
+        background: var(--green2);
+      }
+      .level-3 {
+        background: var(--green3);
+      }
+      .level-4 {
+        background: var(--green4);
+      }
+
+      .invalid {
+        background: #20252d;
+        cursor: not-allowed;
+        opacity: 0.25;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <header>
+        <h1>Commit Canvas</h1>
+        <div class="row">
+          <input
+            id="year"
+            type="number"
+            min="1990"
+            max="2025"
+            value="2025"
+            style="width: 90px"
+          />
+          <input
+            id="massage"
+            type="text"
+            placeholder="Optional commit message"
+            style="width: 200px"
+          />
+          <button id="send">Send</button>
+        </div>
+      </header>
+
+      <div class="row">
+        <input type="file" id="imgInput" accept="image/*" />
+        <select id="scaleMode">
+          <option value="keep">Keep Aspect</option>
+          <option value="stretch">Stretch</option>
+        </select>
+        <button id="imgApply">Convert Image</button>
+      </div>
+
+      <div id="tools">
+        <div id="brush-0" class="brush level-0 selected"></div>
+        <div id="brush-1" class="brush level-1"></div>
+        <div id="brush-2" class="brush level-2"></div>
+        <div id="brush-3" class="brush level-3"></div>
+        <div id="brush-4" class="brush level-4"></div>
+        <span style="color: var(--muted); font-size: 12px">Brush</span>
+      </div>
+
+      <div id="grid"></div>
+    </div>
+
+    <canvas id="hiddenCanvas" style="display: none"></canvas>
+
+    <script>
+      const ROWS = 7;
+      const COLS = 53;
+
+      let matrix = createMatrix();
+      let currentBrush = 0;
+      let drawing = false;
+
+      const grid = document.getElementById("grid");
+      const yearInput = document.getElementById("year");
+      const massageInput = document.getElementById("massage");
+
+      function createMatrix() {
+        return Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+      }
+
+      function dateForCell(year, row, col, startWeekday) {
+        const offset = col * 7 + row - startWeekday;
+        return new Date(year, 0, 1 + offset);
+      }
+
+      function build(year) {
+        grid.innerHTML = "";
+        matrix = createMatrix();
+        const startWeekday = new Date(year, 0, 1).getDay();
+
+        for (let row = 0; row < ROWS; row++) {
+          for (let col = 0; col < COLS; col++) {
+            const d = dateForCell(year, row, col, startWeekday);
+            const cell = document.createElement("div");
+            cell.className = "cell level-0";
+            cell.dataset.r = row;
+            cell.dataset.c = col;
+
+            if (d.getFullYear() !== year) {
+              matrix[row][col] = -1;
+              cell.classList.add("invalid");
+            } else {
+              cell.title = d.toISOString().slice(0, 10);
+              matrix[row][col] = 0;
+              cell.addEventListener("mousedown", () => paintCell(cell));
+              cell.addEventListener(
+                "mouseover",
+                () => drawing && paintCell(cell)
+              );
+            }
+            grid.appendChild(cell);
+          }
+        }
+      }
+
+      function paintCell(cell) {
+        const r = +cell.dataset.r;
+        const c = +cell.dataset.c;
+        if (matrix[r][c] === -1) return;
+        matrix[r][c] = currentBrush;
+        cell.className = "cell level-" + currentBrush;
+      }
+
+      function renderMatrix() {
+        document.querySelectorAll(".cell").forEach((cell) => {
+          const r = +cell.dataset.r;
+          const c = +cell.dataset.c;
+          if (matrix[r][c] >= 0) {
+            cell.className = "cell level-" + matrix[r][c];
+          }
+        });
+      }
+
+      function setBrush(value) {
+        currentBrush = value;
+        document
+          .querySelectorAll(".brush")
+          .forEach((b) => b.classList.remove("selected"));
+        document.getElementById("brush-" + value).classList.add("selected");
+      }
+
+      async function sendData() {
+        const year = +yearInput.value;
+        const massage = massageInput.value;
+        await fetch("/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ year, massage, matrix }),
+        });
+        alert("Sent!");
+      }
+
+      // ---- IMAGE → MATRIX ----
+      document.getElementById("imgApply").onclick = () => applyImage();
+      async function applyImage() {
+        const file = document.getElementById("imgInput").files[0];
+        if (!file) return;
+
+        const mode = document.getElementById("scaleMode").value;
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        await img.decode();
+
+        const canvas = document.getElementById("hiddenCanvas");
+        const ctx = canvas.getContext("2d");
+        console.log(mode);
+
+        if (mode === "keep") {
+          const imgAspect = img.width / img.height;
+          const gridAspect = COLS / ROWS;
+
+          let drawW, drawH;
+
+          if (imgAspect > gridAspect) {
+            // Image is wider → fit to width
+            drawW = COLS;
+            drawH = Math.round(COLS / imgAspect);
+          } else {
+            // Image is taller → fit to height
+            drawH = ROWS;
+            drawW = Math.round(ROWS * imgAspect);
+          }
+
+          canvas.width = COLS;
+          canvas.height = ROWS;
+
+          // Center offsets
+          const offsetX = Math.floor((COLS - drawW) / 2);
+          const offsetY = Math.floor((ROWS - drawH) / 2);
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, offsetX, offsetY, drawW, drawH);
+        } else {
+          // ignore aspect, stretch to full grid exactly
+          canvas.width = COLS;
+          canvas.height = ROWS;
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+
+        const imgData = ctx.getImageData(
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        ).data;
+
+        for (let r = 0; r < ROWS; r++) {
+          for (let c = 0; c < COLS; c++) {
+            if (matrix[r][c] === -1) continue;
+
+            if (r >= canvas.height) {
+              matrix[r][c] = 0;
+              continue;
+            }
+            if (c >= canvas.width) {
+              matrix[r][c] = 0;
+              continue;
+            }
+
+            const i = (r * canvas.width + c) * 4;
+            const avg = (imgData[i] + imgData[i + 1] + imgData[i + 2]) / 3;
+
+            const level = Math.floor((avg / 255) * 5);
+            matrix[r][c] = Math.min(level, 4);
+          }
+        }
+
+        renderMatrix();
+      }
+      yearInput.addEventListener("change", () => {
+        let y = +yearInput.value;
+        yearInput.value = Math.max(1990, Math.min(2025, y));
+        build(y);
+      });
+
+      document.getElementById("send").onclick = sendData;
+
+      document.addEventListener("mousedown", () => (drawing = true));
+      document.addEventListener("mouseup", () => (drawing = false));
+      document.addEventListener("mouseleave", () => (drawing = false));
+
+      document.getElementById("brush-0").onclick = () => setBrush(0);
+      document.getElementById("brush-1").onclick = () => setBrush(1);
+      document.getElementById("brush-2").onclick = () => setBrush(2);
+      document.getElementById("brush-3").onclick = () => setBrush(3);
+      document.getElementById("brush-4").onclick = () => setBrush(4);
+
+      build(+yearInput.value);
+    </script>
+  </body>
+</html>
+
+<!-- <!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Commit Pattern Editor</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+      :root {
+        --bg: #0d1117;
+        --muted: #9aa6a8;
+        --green1: #033a16;
+        --green2: #196c2e;
+        --green3: #2ea043;
+        --green4: #56d364;
+        --invalid: #0d1117;
+        font-family: monospace;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--muted);
+        font-family: Arial, sans-serif;
+        padding: 18px;
+      }
+
+      .container {
+        max-width: 980px;
+        margin: auto;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      h1 {
+        margin: 0;
+        color: var(--green3);
+      }
+
+      #year {
+        width: 100px;
+        padding: 6px;
+        border-radius: 6px;
+        border: none;
+        background: #11161d;
+        color: var(--muted);
+      }
+
+      #send {
+        padding: 6px 14px;
+        border: none;
+        border-radius: 6px;
+        background: var(--green3);
+        color: black;
+        cursor: pointer;
+        font-weight: bold;
+      }
+
+      #tools {
+        margin-top: 16px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .brush {
+        width: 22px;
+        height: 22px;
+        border-radius: 4px;
+        cursor: pointer;
+        border: 2px solid transparent;
+      }
+      .selected {
+        border-color: white;
+      }
+
+      #grid {
+        margin-top: 20px;
+        display: grid;
+        grid-template-columns: repeat(53, 14px);
+        gap: 6px;
+      }
+
+      .cell {
+        width: 16px;
+        height: 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.1s;
+      }
+      .level-0 {
+        background: #11161d;
+      }
+      .level-1 {
+        background: var(--green1);
+      }
+      .level-2 {
+        background: var(--green2);
+      }
+      .level-3 {
+        background: var(--green3);
+      }
+      .level-4 {
+        background: var(--green4);
+      }
+      .invalid {
+        background: var(--invalid);
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
+      input {
+        background-color: #11161d;
+        color: white;
+        border: none;
+        outline: none;
+        padding: 8px;
+      }
+      .brush {
+        border: 1px solid white;
+      }
+      /* #brush-0 {
+        background-color: #11161d;
+      }
+      #brush-1 {
+        background-color: #064d26;
+      }
+      #brush-2 {
+        background-color: #0b6d34;
+      }
+      #brush-3 {
+        background-color: #19a34a;
+      } */
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Commit Pattern Editor</h1>
+        <div>
+          <input id="year" type="number" min="1990" max="2025" value="2025" />
+          <input
+            id="massage"
+            type="text"
+            placeholder="optional commit massage"
+          />
+          <button id="send">Send</button>
+        </div>
+      </header>
+
+      <div id="tools">
+        <div id="brush-0" class="brush level-0 selected"></div>
+        <div id="brush-1" class="brush level-1"></div>
+        <div id="brush-2" class="brush level-2"></div>
+        <div id="brush-3" class="brush level-3"></div>
+        <div id="brush-4" class="brush level-4"></div>
+        <span style="margin-left: 10px">draw</span>
+      </div>
+
+      <div id="grid"></div>
+    </div>
+
+    <script>
+      const ROWS = 7;
+      const COLS = 53;
+
+      let matrix = createMatrix();
+      let currentBrush = 0;
+      let drawing = false;
+
+      const grid = document.getElementById("grid");
+      const yearInput = document.getElementById("year");
+      const massageInput = document.getElementById("massage");
+
+      function createMatrix() {
+        return Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+      }
+
+      function dateForCell(year, row, col, startWeekday) {
+        const offset = col * 7 + row - startWeekday;
+        return new Date(year, 0, 1 + offset);
+      }
+
+      function build(year) {
+        grid.innerHTML = "";
+        matrix = createMatrix();
+
+        const startWeekday = new Date(year, 0, 1).getDay();
+
+        for (let row = 0; row < ROWS; row++) {
+          for (let col = 0; col < COLS; col++) {
+            const d = dateForCell(year, row, col, startWeekday);
+            const cell = document.createElement("div");
+            cell.className = "cell level-0";
+            cell.dataset.r = row;
+            cell.dataset.c = col;
+
+            if (d.getFullYear() !== year) {
+              matrix[row][col] = -1;
+              cell.classList.add("invalid");
+            } else {
+              cell.title = d.toISOString().slice(0, 10);
+              matrix[row][col] = 0;
+
+              cell.addEventListener("mousedown", () => paintCell(cell));
+              cell.addEventListener("mouseover", () => {
+                if (drawing) paintCell(cell);
+              });
+            }
+
+            grid.appendChild(cell);
+          }
+        }
+      }
+
+      function paintCell(cell) {
+        const r = +cell.dataset.r;
+        const c = +cell.dataset.c;
+        if (matrix[r][c] === -1) return;
+
+        matrix[r][c] = currentBrush;
+        cell.className = "cell level-" + currentBrush;
+      }
+
+      function setBrush(value) {
+        currentBrush = value;
+        document
+          .querySelectorAll(".brush")
+          .forEach((b) => b.classList.remove("selected"));
+        document.getElementById("brush-" + value).classList.add("selected");
+      }
+
+      async function sendData() {
+        const year = parseInt(yearInput.value, 10);
+        const massage = massageInput.value;
+        const payload = { year, massage, matrix };
+
+        try {
+          await fetch("/config", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          alert("Sent!");
+        } catch (e) {
+          alert("Send failed");
+        }
+      }
+
+      yearInput.addEventListener("change", () => {
+        let y = +yearInput.value;
+        y = Math.max(1990, Math.min(2025, y));
+        yearInput.value = y;
+        build(y);
+      });
+
+      document.getElementById("send").addEventListener("click", sendData);
+
+      document.addEventListener("mousedown", () => (drawing = true));
+      document.addEventListener("mouseup", () => (drawing = false));
+      document.addEventListener("mouseleave", () => (drawing = false));
+
+      document.getElementById("brush-0").onclick = () => setBrush(0);
+      document.getElementById("brush-1").onclick = () => setBrush(1);
+      document.getElementById("brush-2").onclick = () => setBrush(2);
+      document.getElementById("brush-3").onclick = () => setBrush(3);
+      document.getElementById("brush-4").onclick = () => setBrush(4);
+
+      build(+yearInput.value);
+    </script>
+  </body>
+</html> -->
