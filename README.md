@@ -12,8 +12,8 @@ Add your screenshots of the editor, example patterns, and profile result:
 
 1.  Download or clone this project:
 
-        git clone
-        cd github-trick
+        git clone https://github.com/hasan-bro-coder/commit-canvas
+        cd commit-canvas
 
 2.  Install dependencies:
 
