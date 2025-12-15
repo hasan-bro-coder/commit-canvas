@@ -21,19 +21,13 @@ Add your screenshots of the editor, example patterns, and profile result:
 
 3.  **Create a new GitHub repository via GitHub UI or CLI for the pattern**:
 
-4.  Prepare the repo folder: Inside the project, there is a `repo` directory. Go inside and initialize git:
-
-        cd repo
-        git init
-        cd ..
-
-5.  Start the server:
+4.  Start the server:
 
         node main.js
 
+5.  Wait for all commits to finish (depends on your pattern size).
 6.  Open the browser interface: `http://localhost:3000`, draw your pattern, choose the year, and click **Send**.
-7.  Wait for all commits to finish (depends on your pattern size).
-8.  Push commits to GitHub:
+7.  Push commits to GitHub:
 
         cd repo
         git remote add origin <your-repo-url>
@@ -41,7 +35,7 @@ Add your screenshots of the editor, example patterns, and profile result:
 
     (or `main` depending on your default branch)
 
-9.  ### **to remove the pattern just delete the repository**
+8.  ### **to remove the pattern just delete the repository**
 
 ## Notes
 
