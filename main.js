@@ -129,6 +129,10 @@ app.post("/config", async (req, res) => {
   }
 
   res.json({ status: "ok" });
+
+  console.log("All commits have been created. push the repo to github");
+  
+
   exit();
 });
 
