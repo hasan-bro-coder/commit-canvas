@@ -19,7 +19,7 @@ Add your screenshots of the editor, example patterns, and profile result:
 
         npm install
 
-3.  **Create a new GitHub repository via GitHub UI or CLI**:
+3.  **Create a new GitHub repository via GitHub UI or CLI for the pattern**:
 
 4.  Prepare the repo folder: Inside the project, there is a `repo` directory. Go inside and initialize git:
 
